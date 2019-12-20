@@ -35,7 +35,7 @@ def run_episode(env, policy, seed, max_steps=10000, mtl_reward_expr=None):
 
     return g
 
-def run_episode_v(env, policy, seed, mtl_reward_expr, max_steps=10000):
+def run_episode_v(env, policy, seed, mtl_reward_expr, max_steps=10000, p=None, q=None):
     np.random.seed(seed*10)
     history = []
     for step in range(max_steps):
@@ -43,7 +43,7 @@ def run_episode_v(env, policy, seed, mtl_reward_expr, max_steps=10000):
             break
         s, _, _ = env.step(policy.samplAction(env.state))
         history.append(s)
-    return mtl_reward(mtl_reward_expr, history)
+    return mtl_reward(mtl_reward_expr, history, p=p, q=q)
 
 def run_n_episodes_p(env, policy, p, n=10, theta=None, log_evals=False, max_steps=10, mtl_reward_expr=None):
     if theta is not None:
@@ -88,22 +88,22 @@ def mtl_reward(expr, history, p=None, q=None):
     for i, s in enumerate(history):
         data['p'].append((i * .02, float(s[0]) <= -.5))
         data['q'].append((i * .02, float(s[0]) >=  .5))
-    r = sum(val for _, val in phi(data, time=None))
-    return phi(data)
+    r = phi(data)
+    return r
     # history = np.array(history)[:, 0]
     # print(((history < -.5) | (history > .5)).any())
     # return (history < -.25).any() and (history > .25).any()
     # return (history > -.5).all() and (history < .5).all()
 
 
-def verif(env, policy, mtl_spec, inputsToTry=10):
+def verif(env, policy, mtl_spec, inputsToTry=10, p=None, q=None):
     inputsTried = np.empty((inputsToTry, env.state_dim))
     results = np.empty(inputsToTry).astype(np.bool)
     for i in range(inputsToTry):
         s = env.generate_random_state()
         inputsTried[i] = s
         env.reset(state=s)
-        results[i] = run_episode_v(env, policy, i, mtl_spec)
+        results[i] = run_episode_v(env, policy, i, mtl_spec, p=p, q=q)
     return inputsTried[results], inputsTried[~results]
 
 
@@ -132,7 +132,7 @@ def cartpole_verify():
         returns = train_agent_n_trials(env, policy, bbo, iters=iters, trials=trials)
         print(f'elapsed: {perf_counter() - t0}')
 
-    pos, neg = verif(env, policy, '((F p) & (F q))', inputsToTry=1000, p=lambda x: x < -0.5, q=lambda x: x > 0.5)
+    pos, neg = verif(env, policy, '((F p) & (F q))', inputsToTry=1000, p=lambda x: x > -0.5, q=lambda x: x < 0.5)
     print(len(pos) / (len(pos) + len(neg)))
     pos, neg = pos[:, [0, 2]], neg[:, [0, 2]]
     plt.scatter(pos[:, 0], pos[:, 1], color='black', alpha=.5)
@@ -216,8 +216,8 @@ def cartpole_tl():
 
 def main():
     cartpole_verify()
-    cartpole_normal()
-    cartpole_tl()
+    # cartpole_normal()
+    # cartpole_tl()
 
 
 if __name__ == "__main__":
