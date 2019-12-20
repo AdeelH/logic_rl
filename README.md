@@ -1,4 +1,4 @@
-# logic_rl
+# Using Temporal Logic in Reinforcement Learning
 613 class project
 
 # Requirements
